@@ -1,0 +1,16 @@
+/**************
+Features Detail
+***************/
+
+.detail {
+    background-color: #fff;
+    padding: 20px;
+    &__image {
+        width: 200px;
+        display: block;
+        margin: 30px auto 50px auto;
+    }
+    &__title {
+        margin-left: 20px;
+    }
+}

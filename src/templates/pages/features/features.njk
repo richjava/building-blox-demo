@@ -1,0 +1,63 @@
+{% set page = { 
+  name: 'features',
+  title: 'Features' 
+} %}
+
+{% extends "layout/layout.njk" %}
+
+{% import "components/pagination/_pagination.njk" as paginationComp %}
+
+{% block content %}
+<div class="features item container">
+  <div class="item__header">
+    <h1 class="item__name">{{blox.db.features.contentType.pluralName}}</h1>
+  </div>
+  {% set pagination =  blox.page.pagination %}
+  <script>console.log('pagination: ', {{blox.page | dump}})</script>
+<h1 class="item__name">Items per page: {{pagination.itemsPerPage}}</h1>
+  {% if (pagination.offset + pagination.itemsPerPage) < pagination.total %}
+  {% set upperRange = pagination.offset + pagination.itemsPerPage %}
+  {% else %}
+  {% set upperRange = pagination.total %}
+  {% endif %}
+   <h1 class="item__name">Upper range: {{upperRange}}</h1>
+   {% for i in range(pagination.offset, upperRange) %}
+  <div class="alt">
+    <div class="alt__item alt__item_body">
+      <a href="/features/{{blox.db.features.items[i].slug}}">
+        <h2>{{blox.db.features.items[i].fields.title}}</h2>
+      </a>
+      <p>
+        {{blox.db.features.items[i].fields.body | striptags() | truncate(200)}} <a
+          href="/features/{{blox.db.features.items[i].slug}}">More</a>
+      </p>
+    </div>
+    <div class="alt__item alt__item_figure">
+      <a href="/features/{{blox.db.features.items[i].slug}}"><img class="alt__image"
+          src="{{blox.db.features.items[i].fields.image.sizes.w420}}" alt="{{blox.db.features.items[i].fields.title}}"></a>
+    </div>
+  </div>
+  {% endfor %}
+  
+  {% call paginationComp.nav() %}
+  {% if pagination.currentPage !== 1 %}
+  {{ paginationComp.previous(url = '/' + blox.page.name + '/page-' + (pagination.currentPage - 1)) }}
+  {% else %}
+  {{ paginationComp.disabledPrevious() }}
+  {% endif %}
+  {% for i in range(0, 
+      (pagination.total/pagination.itemsPerPage) | round) -%}
+  {% if pagination.currentPage === i + 1 %}
+  {{ paginationComp.activeItem(i + 1) }}
+  {% else %}
+  {{ paginationComp.nonActiveItem(i + 1, '/' + blox.page.name + '/page-' + (i + 1)) }}
+  {% endif %}
+  {%- endfor %}
+  {% if pagination.currentPage != (pagination.total/2) | round %}
+  {{ paginationComp.next(url = '/' + blox.page.name + '/page-' + (pagination.currentPage + 1)) }}
+  {% else %}
+  {{ paginationComp.disabledNext() }}
+  {% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% set page = { 
+  name: 'features_detail',
+  title: jen.item.fields.title
+  } %}
+
+{% extends "layout/layout.njk" %}
+
+{% block content %}
+{% set item = blox.page.item %}
+<div class="detail item container">
+  <ul class="breadcrumbs">
+    <li><a href="/features/page-1">Features</a></li>
+    <li>{{item.fields.title}}</li>
+  </ul>
+  <div class="detail__header">
+      <img class="detail__image" src="{{item.fields.image.sizes.w420}}" alt="{{jen.item.fields.title}}">
+    <h1>{{item.fields.title}}</h1>
+  </div>
+  <div class="detail__body">
+     {{item.fields.body | safe}}
+  </div>
+</div>
+{% endblock %}
