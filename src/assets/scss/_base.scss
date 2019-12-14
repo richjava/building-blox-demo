@@ -1,0 +1,95 @@
+/************
+Base Styles
+*************/
+
+body {
+	background-color: $bg-color; 
+	font-family: $font-stack;
+}
+
+a {
+	color: $dark-gray;
+}
+
+h1 {
+	font-size: 1.8em;
+}
+
+p {
+	color: $gray;
+	font-size: 1.2em;
+	line-height: 1.6em;
+}
+
+pre {
+	background-color: #eee;
+	color: $dark-gray;
+	display: inline-block;
+	padding: 20px;
+	white-space: pre-wrap;     
+    word-wrap: break-word;      
+}
+
+
+//global styles
+
+.container{
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+
+.item {
+	&__header {
+		padding: 50px 0;
+		text-align: center;
+	}
+	
+	&__name {
+		color: $dark-gray;
+		position: relative;
+		z-index: 1;
+		font-family: Georgia, 'Times New Roman', Times, serif;
+			border-bottom: 2px solid #ccc;
+			display: inline-block;
+			padding: 0 15px 10px 15px;
+	}
+
+	&__name::before{
+		content: '';
+		background-color: $secondary-color;
+		display: inline-block;
+		position: absolute;
+		bottom: -10px;
+		left: -16px;
+		z-index: -1;
+		width: 80px;
+		height: 80px;
+		border-radius: 40px;
+	}
+}
+
+.breadcrumbs {
+	padding: 20px 16px;
+	margin: 0;
+	list-style: none;
+	li {
+			display: inline;
+			font-size: 18px;
+			color: $light-gray;
+	}
+	li+li:before {
+			padding: 8px;
+			color: black;
+			content: "/\00a0";
+	}
+}
+
+// Global media queries
+
+@media only screen and (max-width: 1200px) {
+  .container {
+		width: 100%;
+		padding: 0 10px;
+	}
+}

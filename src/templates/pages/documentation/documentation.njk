@@ -1,0 +1,16 @@
+{% set blox = htmlWebpackPlugin.options.blox %}
+{% set title = blox.page.title %}
+
+
+{% extends "layout/layout.njk" %}
+  
+{% block content %}
+<div class="documentation item container">
+  <div class="item__header">
+    <h1 class="item__name">{{blox.page.title}}</h1>
+  </div>
+  <div>
+      {{blox.db.documentation.fields.body | safe}}
+  </div>
+</div>
+{% endblock %}

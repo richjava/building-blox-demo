@@ -31,7 +31,7 @@
 {%- macro previous(text = 'Previous', url) -%}
   <li class="page-item">
     <a class="page-link" rel="prev" href="{{ url }}" aria-label="{{ text }}">
-      <span class="sr-only">{{ text }}</span>
+      <span>{{ text }}</span>
     </a>
   </li>
 {%- endmacro -%}
@@ -39,7 +39,7 @@
 {%- macro next(text = 'Next', url) -%}
   <li class="page-item">
     <a class="page-link" rel="next" href="{{ url }}" aria-label="{{ text }}">
-      <span class="sr-only">{{ text }}</span>
+      <span>{{ text }}</span>
     </a>
   </li>
 {%- endmacro -%}
@@ -47,7 +47,7 @@
 {%- macro disabledPrevious(text = 'Previous') -%}
   <li class="page-item disabled">
     <span class="page-link">
-      <span class="sr-only">{{ text }}</span>
+      <span>{{ text }}</span>
     </span>
   </li>
 {%- endmacro -%}
@@ -55,7 +55,7 @@
 {%- macro disabledNext(text = 'Next') -%}
   <li class="page-item disabled">
     <span class="page-link">
-      <span class="sr-only">{{ text }}</span>
+      <span>{{ text }}</span>
     </span>
   </li>
 {%- endmacro -%}

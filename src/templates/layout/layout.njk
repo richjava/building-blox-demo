@@ -1,63 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>{{page.title}} | {{blox.app.name}}</title>
-    <meta name="description" content="{{app.description}}" />
-    <meta name="theme-color" content="{{app.pwaThemeColor}}">
-    <link rel="manifest" href="/site.webmanifest">
-    <!-- These are not Jen styles. They're just used for the carousel and can be removed if you want. -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.9.0/slick.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.9.0/slick-theme.min.css" />
-    <!-- Custom styles -->
-</head>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>{{title}} | {{blox.app.name}}</title>
+        <meta name="description" content="{{app.description}}"/>
+        <meta name="theme-color" content="{{app.pwaThemeColor}}">
+        {# <link rel="manifest" href="/site.webmanifest"> #}
+        <!-- These are not Jen styles. They're just used for the carousel and can be removed if you want. -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.9.0/slick.min.css"/>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.9.0/slick-theme.min.css"/>
+        <!-- Custom styles -->
+        <link rel="stylesheet" href="{{ blox.page.path }}assets/css/{{ blox.page.name }}.css"/>
+    </head>
 
-<body>
-    <header>
-        <nav class="main-nav">
-            <ul class="nav">
-                <li class="nav__brand">Brand</li>
-                <li class="nav__item">
-                    <a href="/" {% if page.name == 'home' %}class="nav__link nav__link_active"
+    <body>
+        <header>
+            <nav class="main-nav">
+                <ul class="nav">
+                    <li class="nav__brand">Brand</li>
+                    <li class="nav__item">
+                        <a href="/" {% if blox.page.name == 'home' %}class="nav__link nav__link_active"
                         {% else %}class="nav__link" {% endif %}>Home</a>
-                </li>
-                <li class="nav__item">
-                    <a href="/features/page-1" {% if 'features' in page.name %}class="nav__link nav__link_active"
-                        {% else %}class="nav__link" {% endif %}>Features</a>
-                </li>
-                <li class="nav__item">
-                    <a href="/docs" {% if page.name == 'docs' %}class="nav__link nav__link_active"
+                    </li>
+                    <li class="nav__item">
+                        <a href="/features/page-1" {% if blox.page.name == 'features' %}class="nav__link nav__link_active"
+                         {% else %}class="nav__link" {% endif %}>Features</a>
+                    </li>
+
+                    <li class="nav__item">
+                        <a href="/documentation" {% if blox.page.name == 'documentation' %}class="nav__link nav__link_active"
                         {% else %}class="nav__link" {% endif %}>Documentation</a>
-                </li>
-                <li class="nav__item">
-                    <a href="/admin" {% if page.name == 'admin' %}class="nav__link nav__link_active"
+                    </li>
+                    <li class="nav__item">
+                        <a href="/admin" {% if blox.page.name == 'admin' %}class="nav__link nav__link_active"
                         {% else %}class="nav__link" {% endif %}>Admin</a>
-                </li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        {% block content %} {% endblock %}
-    </main>
-    <!-- Admin page doesn't have a footer -->
-    {% if blox.page.name !== 'admin' %}
-    <footer>
-        <div class="container">
-            <p>Made with love by the folks at <a href="http://appyay.com" target="_blank" rel="noreferrer">Appyay</a>
-            </p>
-        </div>
-    </footer>
-    {% endif %}
-    <!-- These are not Jen scripts. They're just used for the carousel and can be removed if you want. -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.9.0/slick.min.js"></script>
-    <!-- Custom scripts -->
-     {% if blox.page.hasScripts %}
-    <script src="_{{blox.page.name}}.js" inline></script>
-    {% endif %}
-</body>
+                    </li>
+                </ul>
+            </nav>
+        </header>
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        <!-- Admin page doesn't have a footer -->
+        {% if blox.page.name !== 'admin' %}
+            <footer>
+                <div class="container">
+                    <p>Made with love by the folks at <a href="http://appyay.com" target="_blank" rel="noreferrer">Appyay</a>
+                    </p>
+                </div>
+            </footer>
+        {% endif %}
+        <!-- These are not Jen scripts. They're just used for the carousel and can be removed if you want. -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.9.0/slick.min.js"></script>
+        <!-- Custom scripts -->
+        {# <h1 class="item__name">{{blox.page | dump}}</h1> #}
+        {# <h1 class="item__name">{{blox.page[page.name] | dump}}</h1> #}
+        {# <h1 class="item__name">{{blox.page | dump}}</h1> #}
+        {# <p>blox: {{htmlWebpackPlugin.options | dump}}</p> #}
+        {% if blox.page.hasScripts %}
+            <script src="{{blox.page.path}}assets/js/{{blox.page.name}}.js"></script>
+        {% endif %}
+    </body>
 
 </html>

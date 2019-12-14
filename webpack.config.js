@@ -3,7 +3,8 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const ExtraWatchWebpackPlugin = require('extra-watch-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const NunjucksWebpackPlugin = require('nunjucks-webpack-plugin');
+// const NunjucksWebpackPlugin = require('nunjucks-webpack-plugin');
+// const NunjucksWebpackPlugin = require('nunjucks-isomorphic-loader');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const StyleLintPlugin = require('stylelint-webpack-plugin');
@@ -31,25 +32,40 @@ console.log('-----', config.mode)
 
 //---------refactor into lib-------------//
 class BloxLib {
+  page = {};
   pages = [];
+  folders = [];
+  entry = {};
+  itemsPerPage;
+  context;
+
   projectRoot = path.join(__dirname, './')
   templatesPath = `${this.projectRoot}src/templates/pages`
   dataPath = `${this.projectRoot}data`;
-  folders = [];
-  options = {};
-  context;
+  db = require('./data/db.json');
+  data = this.data;
 
-  DEFAULT_ITEMS_PER_PAGE = 50;
+  sassPattern = /\.(sa|sc|c)ss$/;
+  jsPattern = /\.js$/;
+
+  defaultEntryPaths = [
+    // "./src/assets/scss/generated/features.scss",
+    "./src/assets/js/main.js"
+  ];
+  defaultItemsPerPage = 50;
 
   constructor(options = {}) {
-    this.options = options;
-    if (!this.options.itemsPerPage) {
-      this.options.itemsPerPage = this.DEFAULT_ITEMS_PER_PAGE;
-    }
-    this.context = {
+    this.entryPaths = options.entryPaths ? options.entryPaths : this.defaultEntryPaths;
+    this.itemsPerPage = options.itemsPerPage ? options.itemsPerPage : this.defaultItemsPerPage;
+    this.data = options.data || {};
+  }
+
+  createContext() {
+    return {
       blox: {
-        db: require('./data/db.json'),
-        page: {}
+        db: this.db,
+        page: {},
+        ...this.data
       }
     };
   }
@@ -69,14 +85,31 @@ class BloxLib {
     });
   }
 
+  createEntryPaths(folder) {
+    let newEntryPaths = [...this.entryPaths];
+    const entryPath = `./src/assets/scss/generated/${folder}.scss`;
+    newEntryPaths.push(entryPath);
+    this.entry[folder] = newEntryPaths;
+    return newEntryPaths;
+  }
+
   /**
-* Process the templates to generate pages.
-*/
+  * Process the templates to generate pages.
+  */
   async processTemplates() {
     let self = this;
     return new Promise(async (resolve) => {
       for (let i = 0; i < self.folders.length; i++) {
         const folder = self.folders[i]
+        // self.entry = {};
+        let folderPath = self.templatesPath + '/' + folder;
+        self.entry[folder] = self.createEntryPaths(folder);
+        // let newEntryPaths = [...self.entryPaths];
+        // const entryPath = `./src/assets/scss/generated/${folder}.scss`;
+        // newEntryPaths.push(entryPath);
+        // self.entry[folder] = newEntryPaths;
+        let entryConfig = await self.processEntryPoint(folder, `${folder}/${folder}`, folderPath);
+
         let subfolders = await self.getPageFolders(self.templatesPath + '/' + folder)
         let isMasterDetail = false;
         // find a subfolder with the name "detail"
@@ -84,20 +117,16 @@ class BloxLib {
           let subfolder = subfolders[i]
           if (subfolder === 'detail') {
             let detailPath = path.join(self.templatesPath, folder, subfolder)
-            if (self.context.blox.db[folder].items) {
-              await self.generateDetailPages(folder)
+            if (self.context.blox.db[folder] && self.context.blox.db[folder].items) {
+              await self.generatePage(folder, folderPath, entryConfig);
+              await self.generateDetailPages(folder, entryConfig);
               isMasterDetail = true;
               break;
             }
           }
         }
         if (!isMasterDetail) {
-          let folderPath = self.templatesPath + '/' + folder
-          let [hasScripts] = await Promise.all([
-            await self.checkHasScripts(folderPath)
-            // checkHasPartial(folderPath)
-          ])
-          await self.generatePage(folder, folderPath, hasScripts);
+          await self.generatePage(folder, folderPath, entryConfig);
         }
       }
       resolve()
@@ -109,27 +138,35 @@ class BloxLib {
      * A page is a folder with an index file within the public folder.
      * @param {String} folder 
      * @param {String} folderPath 
-     * @param {Boolean} hasScripts 
+     * @param {Object} entryConfig 
      */
-  async generatePage(folder, folderPath, hasScripts) {
+  async generatePage(folder, folderPath, entryConfig) {
+    console.log('generate page:', folder)
+    console.log('generate page, entryConfig:', entryConfig)
     let self = this;
     return new Promise((resolve) => {
+      self.context = self.createContext();
       let newPage = {
         name: folder,
-        hasScripts: hasScripts,
+        title: self.context.blox.db[folder] ? self.context.blox.db[folder].contentType.pluralName : '',
+        rootPage: folder,
+        path: folder === 'home' ? '' : '../',
+        ...entryConfig,
       }
-      self.context.blox.page = {...newPage, ...self.context.blox.page}
+
+      self.context.page = newPage;
+      self.context.db = self.db;
       let page = new HtmlWebpackPlugin({
-        ...self.context,
-        filename: `${folder}/index.html`,
+        blox: self.context,
+        filename: folder === 'home' ? 'index.html' : `${folder}/index.html`,
         template: `src/templates/pages/${folder}/${folder}.njk`,
+        cache: false,
+        inject: false
       })
       self.pages.push(page);
       resolve();
     });
-
   }
-
 
   getPages(options, mode) {
     let self = this;
@@ -138,7 +175,7 @@ class BloxLib {
       self.processTemplates()
         .then(() => {
           resolve(self.pages);
-        })
+        });
       // const pages = glob.sync('**/!(*detail).njk', {
       //   cwd: path.join(__dirname, 'src/templates/pages/'),
       //   root: '/',
@@ -157,31 +194,37 @@ class BloxLib {
    * Generate a pagination page.
    * @param {Object} paginationOptions 
    */
-  generatePaginationPage(paginationOptions) {
+  generatePaginationPage(paginationOptions, entryConfig) {
     let self = this;
     return new Promise(async function (resolve, reject) {
       let folderPath = paginationOptions.templatesPath + '/' + paginationOptions.folder;
-      let hasScripts = await self.checkHasScripts(folderPath)
       let i = paginationOptions.index;
-      if (i === 0 || i === (paginationOptions.currentPage - 1) * self.options.itemsPerPage) {
-        let offset = i === 0 ? 0 : (paginationOptions.currentPage - 1) * self.options.itemsPerPage;
+      if (i === 0 || i === (paginationOptions.currentPage - 1) * self.itemsPerPage) {
+        let offset = i === 0 ? 0 : (paginationOptions.currentPage - 1) * self.itemsPerPage;
+        self.context = self.createContext();
         let newPage = {
           name: paginationOptions.folder,
-          hasScripts: hasScripts,
+          title: self.context.blox.db[paginationOptions.folder].contentType.pluralName,
+          rootPage: paginationOptions.folder,
+          path: '../../',
+          ...entryConfig,
           pagination: {
             currentPage: paginationOptions.currentPage,
             total: paginationOptions.noOfItems,
-            itemsPerPage: self.options.itemsPerPage,
+            itemsPerPage: self.itemsPerPage,
             offset: offset
           }
         }
-        self.context.blox.page = {...newPage, ...self.context.blox.page};
+        self.context.page = newPage;
+        self.context.db = self.db;
         let page = new HtmlWebpackPlugin({
-          ...self.context,
+          blox: self.context,
           filename: `${paginationOptions.folder}/page-${paginationOptions.currentPage}/index.html`,
           template: `src/templates/pages/${paginationOptions.folder}/${paginationOptions.folder}.njk`,
+          cache: false,
+          inject: false
         })
-        console.log('----page', JSON.stringify(page))
+
         self.pages.push(page);
         resolve();
       } else {
@@ -190,56 +233,82 @@ class BloxLib {
     })
   }
 
-  /**
-     * Check if a folder contains script files.
-     * Used to set up the inlining of page-scoped scripts.
-     * @param {String} path
-     */
-  async checkHasScripts(path) {
+  // /**
+  //    * Check if a folder contains files matching a regular expression.
+  //    * @param {String} path
+  //    */
+  // async checkHasScripts(path) {
+  //   return new Promise(function (resolve, reject) {
+  //     // fs.readdir(path, (err, files) => {
+  //     //   if (err) reject(err)
+  //     //   for (let k = 0; k < files.length; k++) {
+  //     //     if (files[k].startsWith('_') && files[k].endsWith('.js')) {
+  //     //       resolve(true)
+  //     //     }
+  //     //   }
+  //     //   resolve(false)
+  //     // })
+
+  //     let jsFiles = fs.readdirSync(path).filter(function (file) {
+  //       console.log('checking file, match--->', file.match(/.*\.js$/))
+  //       return file.match(/.*\.js$/);
+  //     });
+  //     console.log('resolving:' + path, jsFiles)
+  //     resolve(jsFiles.length > 0);
+  //   })
+  //   // .then(function (hasScripts) {
+  //   //   return hasScripts
+  //   // })
+  // }
+
+
+  contains(path, pattern) {
     return new Promise(function (resolve, reject) {
-      fs.readdir(path, (err, files) => {
-        if (err) reject(err)
-        for (let k = 0; k < files.length; k++) {
-          if (files[k].startsWith('_') && files[k].endsWith('.js')) {
-            resolve(true)
-          }
-        }
-        resolve(false)
-      })
-    }).then(function (hasScripts) {
-      return hasScripts
+      let files = fs.readdirSync(path).filter(function (file) {
+        console.log('checking file, match--->', pattern)
+        return file.match(pattern);
+      });
+      console.log('resolving:' + path, files)
+      resolve(files.length > 0);
     })
   }
-  // }
+
 
   /**
    * Generate the detail pages.
    * @param {String} folder 
    * @param {String} subfolder 
    */
-  async generateDetailPages(folder) {
-    console.log('generate detail')
+  async generateDetailPages(folder, entryConfig) {
     let self = this;
     return new Promise(async (resolve) => {
-      // pageType = 'detail';
       const folderPath = path.join(self.templatesPath, folder, 'detail')
-      let hasScripts = await self.checkHasScripts(folderPath)
+      //let detailEntryConfig = await self.processEntryPoint(`${folder}-detail`, `${folder}/detail`, folderPath);
       let items = self.context.blox.db[folder].items;
-    
+      //let folderPath = self.templatesPath + '/' + folder;
+      self.entry[`${folder}-detail`] = self.createEntryPaths(`${folder}-detail`);
+      let detailEntryConfig = await self.processEntryPoint(`${folder}-detail`, `${folder}/detail/${folder}-detail`, folderPath);
+
       let currentPage = 1;
       for (let i = 0; i < items.length; i++) {
-        console.log('generate detail, item', i)
         let item = items[i];
         if (!item.slug) {
           throw new Error('Blox: All items must have a slug');
         }
+        self.context = self.createContext();
         let newPage = {
           name: `${folder}-detail`,
-          hasScripts: hasScripts,
-          item: item
+          title: item.title,
+          rootPage: folder,
+          path: '../../',
+          item: item,
+          ...detailEntryConfig
         }
-        self.context.blox.page = {...newPage, ...self.context.blox.page};
-        currentPage = Math.ceil((i + 1)/self.options.itemsPerPage);
+
+        self.context.page = newPage;
+
+        self.context.db = self.db;
+        currentPage = Math.ceil((i + 1) / self.itemsPerPage);
         let paginationOptions = {
           folder: folder,
           templatesPath: self.templatesPath,
@@ -249,24 +318,40 @@ class BloxLib {
         };
 
         let page = new HtmlWebpackPlugin({
-          ...self.context,
+          blox: self.context,
           filename: `${folder}/${item.slug}/index.html`,
-          template: `src/templates/pages/${paginationOptions.folder}/${paginationOptions.folder}.njk`,
+          template: `src/templates/pages/${paginationOptions.folder}/detail/${paginationOptions.folder}-detail.njk`,
+          cache: false,
+          inject: false
         })
+
         self.pages.push(page);
-        
-        await self.generatePaginationPage(paginationOptions)
+        // console.log('---------------------->>',JSON.stringify(page))
+        await self.generatePaginationPage(paginationOptions, entryConfig)
       }
-      console.log('generate detail, pages', self.pages)
       resolve();
     });
+  }
+
+  async processEntryPoint(folder, folderPath, basePath) {
+    let self = this;
+    let [hasScripts, hasStyles] = await Promise.all([
+      await self.contains(basePath, self.jsPattern),//new RegExp('/'+ folder + '.js+$/i')),
+      await self.contains(basePath, self.sassPattern)
+    ])
+    if (hasScripts) {
+      self.entry[folder].push(`./src/templates/pages/${folderPath}.js`);
+    }
+    if (hasStyles) {
+      //  self.entry[folder].push(`./src/templates/pages/${folder}/_${folder}.scss`);
+    }
+    return { hasScripts: hasScripts, hasStyles: hasStyles };
   }
   /**
        * Get the data ready for templating.
        * Data is retrieved from all files kept in the data directory.
        */
   // async init() {
-  //   console.log('1..')
   //   let self = this;
   //   return new Promise(async (resolve, reject) => {
 
@@ -296,8 +381,12 @@ class BloxLib {
   //   })
   // }
 
-  getData() {
+  getContext() {
     return this.context;
+  }
+
+  getEntry() {
+    return this.entry;
   }
 }
 
@@ -346,28 +435,41 @@ module.exports = async (env, argv) => {
   });
   // await blox.init();
   const pages = await blox.getPages();
-  // console.log('--------------pages', JSON.stringify(pages));
+  const entry = blox.getEntry();
+  console.log('....entry:', JSON.stringify(entry))
+  //  console.log('---------------------->>',JSON.stringify(pages))
+  // pages.forEach(page => {
+  //   console.log('------------------------------------------>>>>page:::', JSON.stringify(page))
+  // });
 
   const nunjucksDevConfig = require('./config/config.dev.json');
   const nunjucksProdConfig = require('./config/config.prod.json');
 
-  let context = blox.getData();
-  context.blox.config = (argv.mod === 'development') ? nunjucksDevConfig : nunjucksProdConfig;
+  // let context = JSON.stringify(blox.getContext());
 
-  const nunjucksOptions = JSON.stringify({
-    searchPaths: path.join(__dirname, 'src/templates/'),
-    context: context
-  });
+  // console.log('>>>>>>>>>>>>>>>>>>>>>CONTEXT', context)
+
+  // const nunjucksOptions = JSON.stringify({
+  //   searchPaths: path.join(__dirname, 'src/templates/'),
+  //   context: context
+  // });
 
   // const devMode = !env || !env.production;
   console.log('---->argv mode', argv.mode)
+  console.log('---->entry', entry)
   return {
     mode: argv.mode,
-    entry: {
-      main: './src/index.js',
-      typescript_demo: './src/typescript_demo.ts',
-      vendor: './src/vendor.js'
-    },
+    entry: entry,
+    // entry: {
+    //   features: ["./src/templates/pages/features/_features.js", "./src/templates/pages/features/_features.scss", "./src/templates/pages/docs/_docs.scss"],
+    //   docs: ["./src/templates/pages/features/_features.js", "./src/templates/pages/features/_features.scss", "./src/templates/pages/docs/_docs.scss"],
+    //   // home: ["./src/templates/pages/home/_home.js", "./src/templates/pages/home/_home.scss", "./src/templates/pages/docs/_docs.scss"],
+    // },
+    // entry: {
+    //   main: './src/index.js',
+    //   typescript_demo: './src/typescript_demo.ts',
+    //   vendor: './src/vendor.js'
+    // },
     devServer: {
       contentBase: './src',
       open: true
@@ -384,14 +486,56 @@ module.exports = async (env, argv) => {
     module: {
       rules: [
         {
+          test: /\.njk$/,
+          use: [
+            {
+              loader: `nunjucks-isomorphic-loader`,
+              query: {
+                root: [path.resolve(__dirname, './src/templates')]
+              }
+            }
+          ]
+        },
+        {
           test: /\.(sa|sc|c)ss$/,
           use: [
             MiniCssExtractPlugin.loader,
             'css-loader',
             'postcss-loader',
-            'sass-loader'
+            {
+              loader: "sass-loader", options: {
+                sassOptions: {
+                  sourceMap: true,
+                  data: '@import "/assets/main";',
+                  includePaths: [
+                    path.join(__dirname, 'src')
+                  ]
+                }
+              }
+            }
           ]
         },
+
+        // {
+        //   test: /\.(sa|sc|c)ss$/,
+        //   use: [
+        //     MiniCssExtractPlugin.loader,
+        //     'css-loader',
+        //     'postcss-loader',
+        //     {
+        //       loader: 'sass-loader',
+        //       options:
+        //       {
+        //         sassOptions: {
+        //           includePaths: [
+        //             "./src/templates/layout/header.scss",
+        //             "./src/templates/layout/footer.scss"
+        //           ]
+        //         }
+        //       }
+        //     }
+        //   ]
+        // },
         {
           test: /\.ts(x?)$/,
           enforce: 'pre',
@@ -456,10 +600,15 @@ module.exports = async (env, argv) => {
             }
           }]
         },
-        {
-          test: /\.(njk|nunjucks)$/,
-          loader: ['html-loader', `nunjucks-html-loader?${nunjucksOptions}`]
-        },
+        // {
+        //   test: /\.(njk|nunjucks)$/,
+        //   use: [
+        //     {
+        //       loader: 'nunjucks-isomorphic-loader'
+        //     }
+        //   ]
+        // }
+
       ]
     },
     stats: {
@@ -468,25 +617,26 @@ module.exports = async (env, argv) => {
     devtool: 'source-map',
     plugins: [
       ...pages,
-      // new webpack.DefinePlugin({
-      //   'process.env.appyay': JSON.stringify(appyay)
+      // new HtmlWebpackPlugin({
+      //   customData: { foo: 'bar' },
+      //   filename: 'home.html',
+      //   template: './src/templates/pages/home/home.njk'
       // }),
-      //(devMode === 'production') && new BuildingBloxPlugin(opts),
-      new BuildingBloxPlugin(appyayOpts, argv.mode),
-      //...(argv.mode !== 'production' ? [] : [new BuildingBloxPlugin(appyayOpts, argv.mode)]),
+      // new HtmlWebpackPlugin({
+      //   customData: { foo: 'bar!!!!!' },
+      //   filename: 'index.html',
+      //   template: './src/templates/index.njk'
+      // }),
       new MiniCssExtractPlugin({
         filename: 'assets/css/[name].css'
       }),
       // new BuildingBloxPlugin(opts),
-      new MiniCssExtractPlugin({
-        filename: 'assets/css/[name].css'
-      }),
       // new StyleLintPlugin(),
-      // new BrowserSyncPlugin({
-      //   host: 'localhost',
-      //   port: 3000,
-      //   server: { baseDir: ['dist'] }
-      // }),
+      new BrowserSyncPlugin({
+        host: 'localhost',
+        port: 3000,
+        server: { baseDir: ['dist'] }
+      }),
       new ExtraWatchWebpackPlugin({
         dirs: ['templates']
       }),

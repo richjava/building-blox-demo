@@ -1,23 +1,20 @@
-{% set page = { 
-  name: 'features_detail',
-  title: jen.item.fields.title
-  } %}
+{% set blox = htmlWebpackPlugin.options.blox %}
+{% set title = blox.blox.page.title %}
 
 {% extends "layout/layout.njk" %}
 
 {% block content %}
-{% set item = blox.page.item %}
 <div class="detail item container">
   <ul class="breadcrumbs">
     <li><a href="/features/page-1">Features</a></li>
-    <li>{{item.fields.title}}</li>
+    <li>{{blox.page.item.fields.title}}</li>
   </ul>
   <div class="detail__header">
-      <img class="detail__image" src="{{item.fields.image.sizes.w420}}" alt="{{jen.item.fields.title}}">
-    <h1>{{item.fields.title}}</h1>
+      <img class="detail__image" src="{{blox.page.item.fields.image.sizes.w420}}" alt="{{blox.page.item.fields.title}}">
+    <h1>{{blox.page.item.fields.title}}</h1>
   </div>
   <div class="detail__body">
-     {{item.fields.body | safe}}
+     {{blox.page.item.fields.body | safe}}
   </div>
 </div>
 {% endblock %}
