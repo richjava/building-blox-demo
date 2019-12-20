@@ -4,17 +4,21 @@
 {% extends "layout/layout.njk" %}
 
 {% block content %}
-<div class="detail item container">
-  <ul class="breadcrumbs">
-    <li><a href="/features/page-1">Features</a></li>
-    <li>{{blox.page.item.fields.title}}</li>
-  </ul>
-  <div class="detail__header">
+  {% include "pages/features/detail/components/reviews/reviews.njk" %}
+  {% include "pages/features/detail/partials/landing/landing.njk" %}
+  <div class="detail item container">
+    <ul class="breadcrumbs">
+      <li>
+        <a href="/features/page-1">Features</a>
+      </li>
+      <li>{{blox.page.item.fields.title}}</li>
+    </ul>
+    <div class="detail__header">
       <img class="detail__image" src="{{blox.page.item.fields.image.sizes.w420}}" alt="{{blox.page.item.fields.title}}">
-    <h1>{{blox.page.item.fields.title}}</h1>
+      <h1>{{blox.page.item.fields.title}}</h1>
+    </div>
+    <div class="detail__body">
+      {{blox.page.item.fields.body | safe}}
+    </div>
   </div>
-  <div class="detail__body">
-     {{blox.page.item.fields.body | safe}}
-  </div>
-</div>
 {% endblock %}

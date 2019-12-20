@@ -3,8 +3,6 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const ExtraWatchWebpackPlugin = require('extra-watch-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-// const NunjucksWebpackPlugin = require('nunjucks-webpack-plugin');
-// const NunjucksWebpackPlugin = require('nunjucks-isomorphic-loader');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const StyleLintPlugin = require('stylelint-webpack-plugin');
@@ -13,29 +11,23 @@ const fs = require('fs')
 const path = require('path');
 const glob = require('glob');
 
-const BuildingBloxPlugin = require('./building-blox-plugin')
+const BuildingBloxPlugin = require('./building-blox-plugin');
 
 const env = process.env.NODE_ENV
 
 const config = {
   mode: env || 'development'
 }
-console.log('-----', config.mode)
-
-
-//const nunjuckspages = require('./nunjuckspages');
-
-//nunjucksContext.config = (isDev) ? nunjucksDevConfig : nunjucksProdConfig;
-//nunjucksContext.db = dbData;
-
-
 
 //---------refactor into lib-------------//
+var yaml = require('js-yaml');
+
 class BloxLib {
   page = {};
   pages = [];
-  folders = [];
+  pageNames = [];
   entry = {};
+  blockUtilConfig = {};
   itemsPerPage;
   context;
 
@@ -49,7 +41,6 @@ class BloxLib {
   jsPattern = /\.js$/;
 
   defaultEntryPaths = [
-    // "./src/assets/scss/generated/features.scss",
     "./src/assets/js/main.js"
   ];
   defaultItemsPerPage = 50;
@@ -72,25 +63,127 @@ class BloxLib {
 
 
   /**
-   * Get Page folders.
-   * Pages are folders within the templates directory.
+   * Get directory names (Blocks are directories within the templates directory).
    * @param {String} dir
    */
-  getPageFolders(dir) {
+  getDirectories(dir) {
     return new Promise((resolve) => {
-      let pageFolders = fs.readdirSync(dir).filter(function (file) {
+      let directories = fs.readdirSync(dir).filter(function (file) {
         return fs.statSync(path.join(dir, file)).isDirectory()
       })
-      resolve(pageFolders);
+      resolve(directories);
     });
   }
 
-  createEntryPaths(folder) {
+  createEntryPaths(blockName) {
     let newEntryPaths = [...this.entryPaths];
-    const entryPath = `./src/assets/scss/generated/${folder}.scss`;
+    const entryPath = `./src/assets/scss/generated/${blockName}.scss`;
     newEntryPaths.push(entryPath);
-    this.entry[folder] = newEntryPaths;
+    this.entry[blockName] = newEntryPaths;
     return newEntryPaths;
+  }
+
+  async connectPageLocalBlocks(pageName, pagePath, blockType) {
+    let self = this;
+    console.log('--->>page name' + pageName + ',' + blockType)
+    return new Promise(function (resolve, reject) {
+      let blockPath = `${self.projectRoot}/src/templates/pages${pagePath}${blockType}/`;
+      fs.stat(blockPath, async function (err, stat) {
+        if (err == null) {
+          var dirs = fs.readdirSync(blockPath, []);
+          if (dirs) {
+            for (let i = 0; i < dirs.length; i++) {
+              let blockName = dirs[i];
+              console.log(JSON.stringify(self.blockUtilConfig))
+              self.blockUtilConfig[pageName].sass += self.getSassContent(
+                pageName,
+                `${blockName} block of ${pageName} page`,
+                `/pages${pagePath}${blockType}/${blockName}/${blockName}`
+              );
+              await self.processEntryPoint(pageName, `./src/templates/pages${pagePath}${blockType}/${blockName}/${blockName}`, `${blockPath}${blockName}`)
+            }
+            resolve()
+          }
+        } else if (err.code === 'ENOENT') {
+          resolve()
+        } else {
+          resolve()
+        }
+      });
+    })
+  }
+
+  async connectGlobalBlocks(blocks, pageName, blockPath) {
+    let basePath = `${this.projectRoot}/src/templates${blockPath}`;
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      this.blockUtilConfig[pageName].sass += this.getSassContent(
+        pageName,
+        `global ${block.name} block of ${pageName} page`,
+        `/${blockPath}/${block.name}/${block.name}`);
+      await this.processEntryPoint(pageName, `./src/templates${blockPath}/${block.name}/${block.name}`, `${basePath}/${block.name}`)
+    }
+    // let basePath = `${this.projectRoot}/src/templates/${blockType}/`;
+    // for (let i = 0; i < blocks.length; i++) {
+    //   const block = blocks[i];
+    //   this.blockUtilConfig[pageName].sass += this.getSassContent(
+    //     pageName,
+    //     `global ${block.name} block of ${pageName} page`,
+    //     `${blockType}/${block.name}/${block.name}`);
+    //   await this.processEntryPoint(pageName, `./src/templates/${blockType}/${blockPath}/${block.name}/${block.name}`, `${basePath}${block.name}`)
+    // }
+  }
+
+  getSassContent(pageName, forText, pathText) {
+    return `\n\n/************\nAuto-generated Sass for ${forText}\n*************/\n@import "../../../templates${pathText}";`;
+  }
+
+  async connectPageGlobalBlocks(blockConfig) {
+    // let blockName = blockConfig.pageName;
+    // this.connectGlobalBlocks(blockConfig.partials, blockConfig.pageName, `/${blockName}/${blockName}`, 'partials');
+    // this.connectGlobalBlocks(blockConfig.components, blockConfig.pageName, `/${blockName}/${blockName}`, 'components');
+    // let sets = blockConfig.sets;
+    // for (let i = 0; i < sets.length; i++) {
+    //   const set = blockConfig.sets[i];
+    //   this.connectGlobalBlocks(set.components, blockName, `/${set.name}/${blockName}/${blockName}`, 'components');
+    // }
+    console.log('block config:', JSON.stringify(blockConfig))
+    this.connectGlobalBlocks(blockConfig.partials, blockConfig.pageName, '/partials');
+    this.connectGlobalBlocks(blockConfig.components, blockConfig.pageName, 'components');
+    let sets = blockConfig.sets;
+    for (let i = 0; i < sets.length; i++) {
+      const set = blockConfig.sets[i];
+      this.connectGlobalBlocks(set.components, blockConfig.pageName, `/sets/${set.name}`);
+    }
+  }
+
+  createBlockUtilConfig() {
+    return {
+      sass: '@import "../index";\n@import "../../../templates/layout/layout";\n',
+      hasScripts: false
+    }
+  }
+
+  async connect(pageName, pagePath, sassConfig){
+
+    //connect page Sass
+    this.blockUtilConfig[pageName].sass += this.getSassContent(
+      pageName,
+      sassConfig.forText,
+      sassConfig.pathText
+    );
+
+    //connect page-scoped partial and component blocks
+    await this.connectPageLocalBlocks(pageName, pagePath, 'partials');
+    await this.connectPageLocalBlocks(pageName, pagePath, 'components');
+
+    //connect blocks that have global (project-level) scope
+    let blockConfig = await this.getBlockConfig(pageName);
+    await this.connectPageGlobalBlocks(blockConfig);
+
+    //write Sass imports to generated page Sass file
+    fs.writeFileSync(`${this.projectRoot}/src/assets/scss/generated/${pageName}.scss`,
+      this.blockUtilConfig[pageName].sass, null, 4);
   }
 
   /**
@@ -99,58 +192,80 @@ class BloxLib {
   async processTemplates() {
     let self = this;
     return new Promise(async (resolve) => {
-      for (let i = 0; i < self.folders.length; i++) {
-        const folder = self.folders[i]
-        // self.entry = {};
-        let folderPath = self.templatesPath + '/' + folder;
-        self.entry[folder] = self.createEntryPaths(folder);
-        // let newEntryPaths = [...self.entryPaths];
-        // const entryPath = `./src/assets/scss/generated/${folder}.scss`;
-        // newEntryPaths.push(entryPath);
-        // self.entry[folder] = newEntryPaths;
-        let entryConfig = await self.processEntryPoint(folder, `${folder}/${folder}`, folderPath);
+      for (let i = 0; i < self.pageNames.length; i++) {
+        const pageName = self.pageNames[i]
+        let pagePath = self.templatesPath + '/' + pageName;
 
-        let subfolders = await self.getPageFolders(self.templatesPath + '/' + folder)
+        self.entry[pageName] = self.createEntryPaths(pageName);
+        let entryConfig = await self.processEntryPoint(pageName, `./src/templates/pages/${pageName}/${pageName}`, pagePath);
+        self.blockUtilConfig[pageName] = self.createBlockUtilConfig();
+        self.blockUtilConfig[pageName].hasScripts = entryConfig.hasScripts;
+        await self.generatePage(pageName, entryConfig);
+        await self.connect(
+          pageName,
+          `/${pageName}/`,
+          {
+            forText: `${pageName} page`, 
+            pathText: `/pages/${pageName}/${pageName}`
+          });
+
+        //process master-detail pattern
+
+        let subDirs = await self.getDirectories(self.templatesPath + '/' + pageName)
         let isMasterDetail = false;
         // find a subfolder with the name "detail"
-        for (let i = 0; i < subfolders.length; i++) {
-          let subfolder = subfolders[i]
-          if (subfolder === 'detail') {
-            let detailPath = path.join(self.templatesPath, folder, subfolder)
-            if (self.context.blox.db[folder] && self.context.blox.db[folder].items) {
-              await self.generatePage(folder, folderPath, entryConfig);
-              await self.generateDetailPages(folder, entryConfig);
+        for (let i = 0; i < subDirs.length; i++) {
+          let subDir = subDirs[i]
+          if (subDir === 'detail') {
+            let detailPath = path.join(self.templatesPath, pageName, subDir)
+            if (self.context.blox.db[pageName] && self.context.blox.db[pageName].items) {
+              // await self.generatePage(pageName, entryConfig);
+              await self.generateDetailPages(pageName, entryConfig);
+              let detailName = `${pageName}-detail`;
+              self.blockUtilConfig[detailName] = self.createBlockUtilConfig();
+              await self.connect(
+                detailName,
+                `/${pageName}/detail/`,
+                {
+                  forText: `detail page of ${pageName} master page`, 
+                  pathText: `/pages/${pageName}/detail/${detailName}`
+                });
               isMasterDetail = true;
               break;
             }
           }
         }
-        if (!isMasterDetail) {
-          await self.generatePage(folder, folderPath, entryConfig);
-        }
+        // if (!isMasterDetail) {
+        //   // await self.generatePage(pageName, entryConfig);
+        //   await self.connect(
+        //     pageName,
+        //     `/${pageName}/`,
+        //     {
+        //       forText: `${pageName} page`, 
+        //       pathText: `pages/${pageName}/${pageName}`
+        //     });
+        // }
       }
       resolve()
     });
   }
 
   /**
-     * Generate a page.
-     * A page is a folder with an index file within the public folder.
-     * @param {String} folder 
+     * Generate a Page.
+     * A Page is a directory with an index file within the public folder.
+     * @param {String} pageName 
      * @param {String} folderPath 
      * @param {Object} entryConfig 
      */
-  async generatePage(folder, folderPath, entryConfig) {
-    console.log('generate page:', folder)
-    console.log('generate page, entryConfig:', entryConfig)
+  async generatePage(pageName, entryConfig) {
     let self = this;
     return new Promise((resolve) => {
       self.context = self.createContext();
       let newPage = {
-        name: folder,
-        title: self.context.blox.db[folder] ? self.context.blox.db[folder].contentType.pluralName : '',
-        rootPage: folder,
-        path: folder === 'home' ? '' : '../',
+        name: pageName,
+        title: self.context.blox.db[pageName] ? self.context.blox.db[pageName].contentType.pluralName : '',
+        rootPage: pageName,
+        path: pageName === 'home' ? '' : '../',
         ...entryConfig,
       }
 
@@ -158,8 +273,8 @@ class BloxLib {
       self.context.db = self.db;
       let page = new HtmlWebpackPlugin({
         blox: self.context,
-        filename: folder === 'home' ? 'index.html' : `${folder}/index.html`,
-        template: `src/templates/pages/${folder}/${folder}.njk`,
+        filename: pageName === 'home' ? 'index.html' : `${pageName}/index.html`,
+        template: `src/templates/pages/${pageName}/${pageName}.njk`,
         cache: false,
         inject: false
       })
@@ -171,22 +286,11 @@ class BloxLib {
   getPages(options, mode) {
     let self = this;
     return new Promise(async (resolve) => {
-      this.folders = await this.getPageFolders(this.templatesPath);
+      this.pageNames = await this.getDirectories(this.templatesPath);
       self.processTemplates()
         .then(() => {
           resolve(self.pages);
         });
-      // const pages = glob.sync('**/!(*detail).njk', {
-      //   cwd: path.join(__dirname, 'src/templates/pages/'),
-      //   root: '/',
-      // }).map(page =>
-      //   new HtmlWebpackPlugin({
-      //     test: "...test",
-      //     filename: page === 'index.njk' ? page.replace('njk', 'html') : path.join(path.basename(page.replace('njk', 'html'), '.html'), 'index.html'),
-      //     // filename: page.replace('njk', 'html'),
-      //     template: `src/templates/pages/${page}`,
-      //   }));
-
     });
   }
 
@@ -233,46 +337,43 @@ class BloxLib {
     })
   }
 
-  // /**
-  //    * Check if a folder contains files matching a regular expression.
-  //    * @param {String} path
-  //    */
-  // async checkHasScripts(path) {
-  //   return new Promise(function (resolve, reject) {
-  //     // fs.readdir(path, (err, files) => {
-  //     //   if (err) reject(err)
-  //     //   for (let k = 0; k < files.length; k++) {
-  //     //     if (files[k].startsWith('_') && files[k].endsWith('.js')) {
-  //     //       resolve(true)
-  //     //     }
-  //     //   }
-  //     //   resolve(false)
-  //     // })
-
-  //     let jsFiles = fs.readdirSync(path).filter(function (file) {
-  //       console.log('checking file, match--->', file.match(/.*\.js$/))
-  //       return file.match(/.*\.js$/);
-  //     });
-  //     console.log('resolving:' + path, jsFiles)
-  //     resolve(jsFiles.length > 0);
-  //   })
-  //   // .then(function (hasScripts) {
-  //   //   return hasScripts
-  //   // })
-  // }
-
-
   contains(path, pattern) {
+    let self = this;
     return new Promise(function (resolve, reject) {
-      let files = fs.readdirSync(path).filter(function (file) {
-        console.log('checking file, match--->', pattern)
+      let files = fs.readdirSync(`${path}`).filter(function (file) {
         return file.match(pattern);
       });
-      console.log('resolving:' + path, files)
       resolve(files.length > 0);
     })
   }
 
+  getBlockConfig(pageName) {
+    let self = this;
+    return new Promise(function (resolve, reject) {
+      const pagePath = `./src/templates/pages/${pageName}`;
+      let blockConfig = {
+        partials: [],
+        components: [],
+        sets: [],
+        pageName: pageName
+      };
+      try {
+        let file = fs.readFileSync(`${self.projectRoot}${pagePath}/${pageName}.yaml`, 'utf8');
+        yaml.safeLoadAll(file, function (doc) {
+
+          if (!doc.partials && !doc.sets && !doc.components) {
+            resolve(blockConfig);
+          }
+          blockConfig.partials = doc.partials || [];
+          blockConfig.components = doc.components || [];
+          blockConfig.sets = doc.sets || [];
+          resolve(blockConfig)
+        });
+      } catch (err) {
+        resolve(blockConfig);
+      }
+    })
+  }
 
   /**
    * Generate the detail pages.
@@ -283,12 +384,12 @@ class BloxLib {
     let self = this;
     return new Promise(async (resolve) => {
       const folderPath = path.join(self.templatesPath, folder, 'detail')
-      //let detailEntryConfig = await self.processEntryPoint(`${folder}-detail`, `${folder}/detail`, folderPath);
       let items = self.context.blox.db[folder].items;
-      //let folderPath = self.templatesPath + '/' + folder;
-      self.entry[`${folder}-detail`] = self.createEntryPaths(`${folder}-detail`);
-      let detailEntryConfig = await self.processEntryPoint(`${folder}-detail`, `${folder}/detail/${folder}-detail`, folderPath);
+      let detailName = `${folder}-detail`;
 
+      self.entry[detailName] = self.createEntryPaths(detailName);
+      let detailEntryConfig = await self.processEntryPoint(detailName, `${folderPath}/${detailName}`, folderPath);
+      
       let currentPage = 1;
       for (let i = 0; i < items.length; i++) {
         let item = items[i];
@@ -297,7 +398,7 @@ class BloxLib {
         }
         self.context = self.createContext();
         let newPage = {
-          name: `${folder}-detail`,
+          name: detailName,
           title: item.title,
           rootPage: folder,
           path: '../../',
@@ -320,13 +421,12 @@ class BloxLib {
         let page = new HtmlWebpackPlugin({
           blox: self.context,
           filename: `${folder}/${item.slug}/index.html`,
-          template: `src/templates/pages/${paginationOptions.folder}/detail/${paginationOptions.folder}-detail.njk`,
+          template: `src/templates/pages/${folder}/detail/${detailName}.njk`,
           cache: false,
           inject: false
         })
 
         self.pages.push(page);
-        // console.log('---------------------->>',JSON.stringify(page))
         await self.generatePaginationPage(paginationOptions, entryConfig)
       }
       resolve();
@@ -335,52 +435,14 @@ class BloxLib {
 
   async processEntryPoint(folder, folderPath, basePath) {
     let self = this;
-    let [hasScripts, hasStyles] = await Promise.all([
-      await self.contains(basePath, self.jsPattern),//new RegExp('/'+ folder + '.js+$/i')),
-      await self.contains(basePath, self.sassPattern)
-    ])
+    let hasScripts = await self.contains(basePath, self.jsPattern);
+    console.log('-->processEntryPoint:' + folderPath + ', basePath: ' + basePath)
     if (hasScripts) {
-      self.entry[folder].push(`./src/templates/pages/${folderPath}.js`);
+      self.entry[folder].push(`${folderPath}.js`);
     }
-    if (hasStyles) {
-      //  self.entry[folder].push(`./src/templates/pages/${folder}/_${folder}.scss`);
-    }
-    return { hasScripts: hasScripts, hasStyles: hasStyles };
+    return { hasScripts: hasScripts };
   }
-  /**
-       * Get the data ready for templating.
-       * Data is retrieved from all files kept in the data directory.
-       */
-  // async init() {
-  //   let self = this;
-  //   return new Promise(async (resolve, reject) => {
-
-  //     this.folders = await this.getPageFolders(this.templatesPath);
-  //     fs.readdir(self.dataPath, (err, files) => {
-  //       if (err) reject(err)
-  //       let dataArray = []
-  //       files.forEach(file => {
-  //         let content = require(`${self.dataPath}/${file}`)
-  //         if (file === 'db.json') {
-  //           content = { db: content }
-  //         }
-  //         dataArray.push(content)
-  //       })
-  //       resolve(dataArray)
-  //     })
-  //   }).then(dataArray => {
-  //     let pageData = {
-  //       page: {},
-  //       item: {},
-  //       pagination: {}
-  //     }
-  //     let projectData = dataArray.reduce(function (result, current) {
-  //       return Object.assign(result, current)
-  //     }, {});
-  //     self.data.blox = { ...pageData, ...projectData };
-  //   })
-  // }
-
+  
   getContext() {
     return this.context;
   }
@@ -390,24 +452,7 @@ class BloxLib {
   }
 }
 
-
-
-//---------end refactor into lib-------------//
-
-
-// const pages = glob.sync('**/!(*detail).njk', {
-//   cwd: path.join(__dirname, 'src/templates/pages/'),
-//   root: '/',
-// }).map(page => new HtmlWebpackPlugin({
-//   test: "...test",
-//   filename: page === 'index.njk' ? page.replace('njk', 'html') : path.join(path.basename(page.replace('njk', 'html'), '.html'), 'index.html'),
-//   // filename: page.replace('njk', 'html'),
-//   template: `src/templates/pages/${page}`,
-// }));
-
-
-
-
+/* END REFACTOR INTO LIBRARY */
 
 
 var appyayOpts = {
@@ -433,52 +478,21 @@ module.exports = async (env, argv) => {
   const blox = new BloxLib({
     itemsPerPage: 2
   });
-  // await blox.init();
   const pages = await blox.getPages();
   const entry = blox.getEntry();
   console.log('....entry:', JSON.stringify(entry))
-  //  console.log('---------------------->>',JSON.stringify(pages))
-  // pages.forEach(page => {
-  //   console.log('------------------------------------------>>>>page:::', JSON.stringify(page))
-  // });
 
   const nunjucksDevConfig = require('./config/config.dev.json');
   const nunjucksProdConfig = require('./config/config.prod.json');
-
-  // let context = JSON.stringify(blox.getContext());
-
-  // console.log('>>>>>>>>>>>>>>>>>>>>>CONTEXT', context)
-
-  // const nunjucksOptions = JSON.stringify({
-  //   searchPaths: path.join(__dirname, 'src/templates/'),
-  //   context: context
-  // });
-
-  // const devMode = !env || !env.production;
-  console.log('---->argv mode', argv.mode)
-  console.log('---->entry', entry)
+  // console.log('---->argv mode', argv.mode)
+  // console.log('---->entry', entry)
   return {
     mode: argv.mode,
     entry: entry,
-    // entry: {
-    //   features: ["./src/templates/pages/features/_features.js", "./src/templates/pages/features/_features.scss", "./src/templates/pages/docs/_docs.scss"],
-    //   docs: ["./src/templates/pages/features/_features.js", "./src/templates/pages/features/_features.scss", "./src/templates/pages/docs/_docs.scss"],
-    //   // home: ["./src/templates/pages/home/_home.js", "./src/templates/pages/home/_home.scss", "./src/templates/pages/docs/_docs.scss"],
-    // },
-    // entry: {
-    //   main: './src/index.js',
-    //   typescript_demo: './src/typescript_demo.ts',
-    //   vendor: './src/vendor.js'
-    // },
     devServer: {
       contentBase: './src',
       open: true
     },
-    // output: {
-    //   path: path.join(__dirname, 'dist'),
-    //   filename: 'assets/js/[name].js',
-    //   library: 'MainModule',
-    // },
     output: {
       path: path.join(__dirname, 'dist'),
       filename: 'assets/js/[name].js'
@@ -506,7 +520,7 @@ module.exports = async (env, argv) => {
               loader: "sass-loader", options: {
                 sassOptions: {
                   sourceMap: true,
-                  data: '@import "/assets/main";',
+                  // data: '@import "/assets/main";',
                   includePaths: [
                     path.join(__dirname, 'src')
                   ]

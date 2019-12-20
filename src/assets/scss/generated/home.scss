@@ -1,13 +1,18 @@
-/************
-Auto-generated Sass file for Home
-*************/
+@import "../index";
+@import "../../../templates/layout/layout";
 
-@import "../main";
+
+/************
+Auto-generated Sass for home page
+*************/
 @import "../../../templates/pages/home/home";
 
 /************
-Landing Component
+Auto-generated Sass for landing block of home page
 *************/
-
 @import "../../../templates/pages/home/components/landing/landing";
-@import "../../../templates/pages/home/components/reviews/reviews";
+
+/************
+Auto-generated Sass for global reviews block of home page
+*************/
+@import "../../../templates//partials/reviews/reviews";
