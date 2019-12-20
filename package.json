@@ -3,12 +3,11 @@
   "version": "0.0.1",
   "description": "simple webpack scaffolding with nunjucks",
   "scripts": {
-    "dev": "webpack-dev-server --mode development",
     "build": "webpack --mode production",
-    "watch": "webpack --watch --mode development",
-    "watch:prod": "webpack --watch --production"
+    "dev": "webpack --watch --mode development",
+    "dev:prod": "webpack --watch --production"
   },
-  "author": "Andrea Briganti <kbytesys@gmail.com>",
+  "author": "Richard Lovell <richjavalabs@gmail.com>",
   "license": "MPL-2.0",
   "devDependencies": {
     "@babel/core": "^7.7.5",

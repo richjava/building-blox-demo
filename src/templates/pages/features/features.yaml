@@ -1,5 +1,16 @@
 ---
-sets:
+componentSets:
        - name: bootstrap
-         components:
+         blocks:
             - name: pagination
+       - name: default
+          blocks:
+            - name: reviews
+partialSets:
+       - name: default
+         blocks:
+            - name: landing
+# sets:
+#        - name: bootstrap
+#          components:
+#             - name: pagination

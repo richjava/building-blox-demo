@@ -3,12 +3,8 @@
 {# {% set title = blox.page.item %} #}
 {# {% set page = page | setAttribute("title", "Home") %} #}
 {% extends "layout/layout.njk" %}
-{# {% set vars = htmlWebpackPlugin.options.customData %} #}
 {% block content %}
-{# <h1>Vars::{{ blox.page | dump }}</h1> #}
-{# <h1>Name::{{ page.name }}</h1> #}
-
     <!-- Partials -->
-    {% include "pages/home/components/landing/landing.njk" %}
-    {% include "partials/reviews/reviews.njk" %}
+    {% include "pages/home/partials/landing/landing.njk" %}
+    {% include "pages/home/components/reviews/reviews.njk" %}
 {% endblock %}

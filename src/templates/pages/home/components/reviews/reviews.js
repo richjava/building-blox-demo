@@ -8,4 +8,4 @@ $('.slider').slick({
   fade: true,
   cssEase: 'linear'
 });
-console.log('Hi from reviews');
+console.log('Hi from reviews.js');

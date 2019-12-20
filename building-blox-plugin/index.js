@@ -44,56 +44,52 @@ var BuildingBloxPlugin = (function () {
      * Get the data ready for templating.
      * Data is retrieved from all files kept in the data directory.
      */
-    async function init () {
+    async function init() {
         return new Promise((resolve, reject) => {
-          fs.readdir(dataPath, (err, files) => {
-            if (err) reject(err)
-            let dataArray = []
-            files.forEach(file => {
-              let content = require(`${dataPath}/${file}`)
-              if (file === 'db.json') {
-                content = { db: content }
-              }
-              dataArray.push(content)
+            fs.readdir(dataPath, (err, files) => {
+                if (err) reject(err)
+                let dataArray = []
+                files.forEach(file => {
+                    let content = require(`${dataPath}/${file}`)
+                    if (file === 'db.json') {
+                        content = { db: content }
+                    }
+                    dataArray.push(content)
+                })
+                resolve(dataArray)
             })
-            resolve(dataArray)
-          })
         }).then(dataArray => {
-          // globalData.jen = dataArray.reduce(function (result, current) {
-          //   return Object.assign(result, current)
-          // }, {})
-          let pageData = {
-            page: {},
-            item: {},
-            pagination: {} 
-          }
-          let projectData =  dataArray.reduce(function (result, current) {
-            return Object.assign(result, current)
-          }, {});
-           globalData.blox = {...pageData, ...projectData};
-           console.log('globalData:', console.log(JSON.stringify(globalData)))
+            // globalData.jen = dataArray.reduce(function (result, current) {
+            //   return Object.assign(result, current)
+            // }, {})
+            let pageData = {
+                page: {},
+                item: {},
+                pagination: {}
+            }
+            let projectData = dataArray.reduce(function (result, current) {
+                return Object.assign(result, current)
+            }, {});
+            globalData.blox = { ...pageData, ...projectData };
+            console.log('globalData:', console.log(JSON.stringify(globalData)))
         })
-      }
+    }
 
     function _createFile(options, mode) {
         return async () => {
-            
             if (mode === 'production') {
                 const fullPath = path.join(options.path, options.fileName);
                 let data = await loadData(options);
                 await write.sync(fullPath, data);
             }
-            // await init();
-            // const folders = getPages(templatesPath);
-            // console.log('folders', JSON.stringify(folders))
         }
     }
 
-/**
-  * Get pages.
-  * Pages are folders within the templates directory.
-  * @param {String} dir
-  */
+    /**
+      * Get pages.
+      * Pages are folders within the templates directory.
+      * @param {String} dir
+      */
     function getPages(dir) {
         return fs.readdirSync(dir).filter(function (file) {
             return fs.statSync(path.join(dir, file)).isDirectory()
@@ -109,7 +105,6 @@ var BuildingBloxPlugin = (function () {
     function loadData(options) {
         return new Promise((resolve, reject) => {
             let dataUrl = `${options.apiEndpoint}?apikey=${options.apiKey}`;
-            //options.dataUrl !== undefined ? options.dataUrl : argv.dataUrl;
             axios
                 .get(dataUrl)
                 .then((response) => {

@@ -61,9 +61,9 @@
         {# <h1 class="item__name">{{blox.page[page.name] | dump}}</h1> #}
         {# <h1 class="item__name">{{blox.page | dump}}</h1> #}
         {# <p>blox: {{htmlWebpackPlugin.options | dump}}</p> #}
-        {% if blox.page.hasScripts %}
+        {# {% if blox.page.hasScripts %} #}
             <script src="{{blox.page.path}}assets/js/{{blox.page.name}}.js"></script>
-        {% endif %}
+        {# {% endif %} #}
     </body>
 
 </html>

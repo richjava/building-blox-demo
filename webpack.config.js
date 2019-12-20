@@ -21,6 +21,8 @@ const config = {
 
 //---------refactor into lib-------------//
 var yaml = require('js-yaml');
+const axios = require('axios');
+const write = require('write-data');
 
 class BloxLib {
   page = {};
@@ -30,11 +32,12 @@ class BloxLib {
   blockUtilConfig = {};
   itemsPerPage;
   context;
+  options;
 
   projectRoot = path.join(__dirname, './')
   templatesPath = `${this.projectRoot}src/templates/pages`
   dataPath = `${this.projectRoot}data`;
-  db = require('./data/db.json');
+  db = require('./src/data/db.json');
   data = this.data;
 
   sassPattern = /\.(sa|sc|c)ss$/;
@@ -46,9 +49,33 @@ class BloxLib {
   defaultItemsPerPage = 50;
 
   constructor(options = {}) {
+    this.options = options;
     this.entryPaths = options.entryPaths ? options.entryPaths : this.defaultEntryPaths;
     this.itemsPerPage = options.itemsPerPage ? options.itemsPerPage : this.defaultItemsPerPage;
     this.data = options.data || {};
+
+  }
+
+  loadData() {
+    return new Promise((resolve, reject) => {
+      if (!this.options.apiEndpoint) {
+        throw new Error('Please provide "apiEndpoint"');
+      }
+      if (!this.options.apiKey) {
+        throw new Error('Please provide "apiKey"');
+      }
+      const fullPath = path.join(this.projectRoot, 'src/data/db.json');
+      let dataUrl = `${this.options.apiEndpoint}?apikey=${this.options.apiKey}`;
+      axios
+        .get(dataUrl)
+        .then(async (response) => {
+          await write.sync(fullPath, response.data);
+          resolve();
+        })
+        .catch(function (error) {
+          reject(error)
+        })
+    });
   }
 
   createContext() {
@@ -114,23 +141,23 @@ class BloxLib {
   }
 
   async connectGlobalBlocks(blocks, pageName, blockPath) {
-    let basePath = `${this.projectRoot}/src/templates${blockPath}`;
+    let basePath = `${this.projectRoot}/src/templates/sets${blockPath}`;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       this.blockUtilConfig[pageName].sass += this.getSassContent(
         pageName,
         `global ${block.name} block of ${pageName} page`,
-        `/${blockPath}/${block.name}/${block.name}`);
-      await this.processEntryPoint(pageName, `./src/templates${blockPath}/${block.name}/${block.name}`, `${basePath}/${block.name}`)
+        `/sets${blockPath}/${block.name}/${block.name}`);
+      await this.processEntryPoint(pageName, `./src/templates/sets${blockPath}/${block.name}/${block.name}`, `${basePath}/${block.name}`)
     }
-    // let basePath = `${this.projectRoot}/src/templates/${blockType}/`;
+    // let basePath = `${this.projectRoot}/src/templates${blockPath}`;
     // for (let i = 0; i < blocks.length; i++) {
     //   const block = blocks[i];
     //   this.blockUtilConfig[pageName].sass += this.getSassContent(
     //     pageName,
     //     `global ${block.name} block of ${pageName} page`,
-    //     `${blockType}/${block.name}/${block.name}`);
-    //   await this.processEntryPoint(pageName, `./src/templates/${blockType}/${blockPath}/${block.name}/${block.name}`, `${basePath}${block.name}`)
+    //     `/${blockPath}/${block.name}/${block.name}`);
+    //   await this.processEntryPoint(pageName, `./src/templates${blockPath}/${block.name}/${block.name}`, `${basePath}/${block.name}`)
     // }
   }
 
@@ -138,7 +165,7 @@ class BloxLib {
     return `\n\n/************\nAuto-generated Sass for ${forText}\n*************/\n@import "../../../templates${pathText}";`;
   }
 
-  async connectPageGlobalBlocks(blockConfig) {
+  async connectPageGlobalBlocks(setConfig) {
     // let blockName = blockConfig.pageName;
     // this.connectGlobalBlocks(blockConfig.partials, blockConfig.pageName, `/${blockName}/${blockName}`, 'partials');
     // this.connectGlobalBlocks(blockConfig.components, blockConfig.pageName, `/${blockName}/${blockName}`, 'components');
@@ -147,13 +174,18 @@ class BloxLib {
     //   const set = blockConfig.sets[i];
     //   this.connectGlobalBlocks(set.components, blockName, `/${set.name}/${blockName}/${blockName}`, 'components');
     // }
-    console.log('block config:', JSON.stringify(blockConfig))
-    this.connectGlobalBlocks(blockConfig.partials, blockConfig.pageName, '/partials');
-    this.connectGlobalBlocks(blockConfig.components, blockConfig.pageName, 'components');
-    let sets = blockConfig.sets;
-    for (let i = 0; i < sets.length; i++) {
-      const set = blockConfig.sets[i];
-      this.connectGlobalBlocks(set.components, blockConfig.pageName, `/sets/${set.name}`);
+    console.log('block config:', JSON.stringify(setConfig))
+    // this.connectGlobalBlocks(blockConfig.partials, blockConfig.pageName, '/partials');
+    // this.connectGlobalBlocks(blockConfig.components, blockConfig.pageName, '/components');
+    // let partialSets = blockConfig.partialSets;
+    for (let i = 0; i < setConfig.partialSets.length; i++) {
+      const partialSet = setConfig.partialSets[i];
+      this.connectGlobalBlocks(partialSet.blocks, setConfig.pageName, `/partials/${partialSet.name}`);
+    }
+
+    for (let i = 0; i < setConfig.componentSets.length; i++) {
+      const componentSet = setConfig.componentSets[i];
+      this.connectGlobalBlocks(componentSet.blocks, setConfig.pageName, `/components/${componentSet.name}`);
     }
   }
 
@@ -164,7 +196,7 @@ class BloxLib {
     }
   }
 
-  async connect(pageName, pagePath, sassConfig){
+  async connect(pageName, pagePath, sassConfig) {
 
     //connect page Sass
     this.blockUtilConfig[pageName].sass += this.getSassContent(
@@ -205,7 +237,7 @@ class BloxLib {
           pageName,
           `/${pageName}/`,
           {
-            forText: `${pageName} page`, 
+            forText: `${pageName} page`,
             pathText: `/pages/${pageName}/${pageName}`
           });
 
@@ -227,7 +259,7 @@ class BloxLib {
                 detailName,
                 `/${pageName}/detail/`,
                 {
-                  forText: `detail page of ${pageName} master page`, 
+                  forText: `detail page of ${pageName} master page`,
                   pathText: `/pages/${pageName}/detail/${detailName}`
                 });
               isMasterDetail = true;
@@ -286,6 +318,9 @@ class BloxLib {
   getPages(options, mode) {
     let self = this;
     return new Promise(async (resolve) => {
+      if (self.options.mode && self.options.mode === 'production') {
+        await self.loadData();
+      }
       this.pageNames = await this.getDirectories(this.templatesPath);
       self.processTemplates()
         .then(() => {
@@ -352,9 +387,8 @@ class BloxLib {
     return new Promise(function (resolve, reject) {
       const pagePath = `./src/templates/pages/${pageName}`;
       let blockConfig = {
-        partials: [],
-        components: [],
-        sets: [],
+        partialSets: [],
+        componentSets: [],
         pageName: pageName
       };
       try {
@@ -364,14 +398,35 @@ class BloxLib {
           if (!doc.partials && !doc.sets && !doc.components) {
             resolve(blockConfig);
           }
-          blockConfig.partials = doc.partials || [];
-          blockConfig.components = doc.components || [];
-          blockConfig.sets = doc.sets || [];
+          blockConfig.partialSets = doc.partialSets || [];
+          blockConfig.componentSets = doc.componentSets || [];
           resolve(blockConfig)
         });
       } catch (err) {
         resolve(blockConfig);
       }
+      // const pagePath = `./src/templates/pages/${pageName}`;
+      // let blockConfig = {
+      //   partials: [],
+      //   components: [],
+      //   sets: [],
+      //   pageName: pageName
+      // };
+      // try {
+      //   let file = fs.readFileSync(`${self.projectRoot}${pagePath}/${pageName}.yaml`, 'utf8');
+      //   yaml.safeLoadAll(file, function (doc) {
+
+      //     if (!doc.partials && !doc.sets && !doc.components) {
+      //       resolve(blockConfig);
+      //     }
+      //     blockConfig.partials = doc.partials || [];
+      //     blockConfig.components = doc.components || [];
+      //     blockConfig.sets = doc.sets || [];
+      //     resolve(blockConfig)
+      //   });
+      // } catch (err) {
+      //   resolve(blockConfig);
+      // }
     })
   }
 
@@ -389,7 +444,7 @@ class BloxLib {
 
       self.entry[detailName] = self.createEntryPaths(detailName);
       let detailEntryConfig = await self.processEntryPoint(detailName, `${folderPath}/${detailName}`, folderPath);
-      
+
       let currentPage = 1;
       for (let i = 0; i < items.length; i++) {
         let item = items[i];
@@ -442,7 +497,7 @@ class BloxLib {
     }
     return { hasScripts: hasScripts };
   }
-  
+
   getContext() {
     return this.context;
   }
@@ -476,6 +531,9 @@ let setUpApi = function (env) {
 
 module.exports = async (env, argv) => {
   const blox = new BloxLib({
+    mode: argv.mode,
+    apiEndpoint: 'http://localhost:3000/cd/v1/environments/5dcd631170e43026b85628fe/export',
+    apiKey: 'FFASSPRFNQQVIMBBJYXEYVBBLI7E4T3RNM4TWOJXOI2X23BWOMYA',
     itemsPerPage: 2
   });
   const pages = await blox.getPages();
